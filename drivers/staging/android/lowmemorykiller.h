@@ -1,10 +1,3 @@
-/*
- * Copyright (C) 2018 Sony Mobile Communications Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2, as
- * published by the Free Software Foundation.
- */
 #ifndef __LOWMEMORYKILLER_H
 #define __LOWMEMORYKILLER_H
 
@@ -66,8 +59,8 @@ static inline int task_trylock_lmk(struct task_struct *p)
 #else
 #define LMK_TAG_TASK_DIE(x)			\
 	do {					\
+		task_set_lmk_waiting(x);	\
 		if (x->mm) {			\
-			task_set_lmk_waiting(x);\
 			if (!test_bit(MMF_OOM_SKIP, &x->mm->flags) && \
 			    oom_reaper) { \
 				mark_lmk_victim(x); \

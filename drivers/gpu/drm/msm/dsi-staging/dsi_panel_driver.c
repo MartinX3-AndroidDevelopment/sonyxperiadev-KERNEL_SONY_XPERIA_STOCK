@@ -9,13 +9,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-/*
- * Copyright (C) 2017 Sony Mobile Communications Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2, as
- * published by the Free Software Foundation.
- */
 
 #include <linux/sysfs.h>
 #include <linux/device.h>
@@ -2133,8 +2126,7 @@ static void dsi_panel_driver_notify_suspend(struct dsi_panel *panel)
 	event.data = &blank;
 
 	drm_notifier_call_chain(DRM_EXT_EVENT_BEFORE_BLANK, &event);
-
- }
+}
 
 static void dsi_panel_driver_oled_short_det_setup(struct dsi_panel *panel,
 								bool enable)

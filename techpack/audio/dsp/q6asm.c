@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
  * Author: Brian Swetland <swetland@google.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -719,7 +719,7 @@ static bool q6asm_is_valid_audio_client(struct audio_client *ac)
 static void q6asm_session_free(struct audio_client *ac)
 {
 	int session_id;
-	unsigned long flags;
+	unsigned long flags = 0;
 
 	pr_debug("%s: sessionid[%d]\n", __func__, ac->session);
 	session_id = ac->session;
@@ -1701,7 +1701,7 @@ static int32_t q6asm_srvc_callback(struct apr_client_data *data, void *priv)
 	uint32_t dir = 0;
 	uint32_t i = IN;
 	uint32_t *payload;
-	unsigned long dsp_flags;
+	unsigned long dsp_flags = 0;
 	unsigned long flags = 0;
 	struct asm_buffer_node *buf_node = NULL;
 	struct list_head *ptr, *next;
@@ -1933,7 +1933,7 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 {
 	int i = 0;
 	struct audio_client *ac = (struct audio_client *)priv;
-	unsigned long dsp_flags;
+	unsigned long dsp_flags = 0;
 	uint32_t *payload;
 	uint32_t wakeup_flag = 1;
 	int32_t  ret = 0;
@@ -1941,7 +1941,7 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 	uint8_t buf_index;
 	struct msm_adsp_event_data *pp_event_package = NULL;
 	uint32_t payload_size = 0;
-	unsigned long flags;
+	unsigned long flags = 0;
 	int session_id;
 
 	if (ac == NULL) {
@@ -2010,6 +2010,7 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 		data->dest_port);
 	if ((data->opcode != ASM_DATA_EVENT_RENDERED_EOS) &&
 	    (data->opcode != ASM_DATA_EVENT_EOS) &&
+	    (data->opcode != ASM_SESSION_EVENTX_OVERFLOW) &&
 	    (data->opcode != ASM_SESSION_EVENT_RX_UNDERFLOW)) {
 		if (payload == NULL) {
 			pr_err("%s: payload is null\n", __func__);
@@ -2230,6 +2231,16 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 			}
 			spin_lock_irqsave(&port->dsp_lock, dsp_flags);
 			buf_index = asm_token._token.buf_index;
+			if (buf_index < 0 || buf_index >= port->max_buf_cnt) {
+				pr_debug("%s: Invalid buffer index %u\n",
+				__func__, buf_index);
+				spin_unlock_irqrestore(&port->dsp_lock,
+						dsp_flags);
+				spin_unlock_irqrestore(
+					&(session[session_id].session_lock),
+					flags);
+				return -EINVAL;
+			}
 			if (data->payload_size >= 2 * sizeof(uint32_t) &&
 				(lower_32_bits(port->buf[buf_index].phys) !=
 				payload[0] ||
@@ -2338,6 +2349,16 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 			}
 			spin_lock_irqsave(&port->dsp_lock, dsp_flags);
 			buf_index = asm_token._token.buf_index;
+			if (buf_index < 0 || buf_index >= port->max_buf_cnt) {
+				pr_debug("%s: Invalid buffer index %u\n",
+				__func__, buf_index);
+				spin_unlock_irqrestore(&port->dsp_lock,
+								dsp_flags);
+				spin_unlock_irqrestore(
+					&(session[session_id].session_lock),
+					flags);
+				return -EINVAL;
+			}
 			port->buf[buf_index].used = 0;
 			if (lower_32_bits(port->buf[buf_index].phys) !=
 			payload[READDONE_IDX_BUFADD_LSW] ||
@@ -2672,7 +2693,7 @@ int q6asm_is_dsp_buf_avail(int dir, struct audio_client *ac)
 static void __q6asm_add_hdr(struct audio_client *ac, struct apr_hdr *hdr,
 			uint32_t pkt_size, uint32_t cmd_flg, uint32_t stream_id)
 {
-	unsigned long flags;
+	unsigned long flags = 0;
 
 	dev_vdbg(ac->dev, "%s: pkt_size=%d cmd_flg=%d session=%d stream_id=%d\n",
 			__func__, pkt_size, cmd_flg, ac->session, stream_id);
@@ -9054,11 +9075,11 @@ static int __q6asm_cmd(struct audio_client *ac, int cmd, uint32_t stream_id)
 	int cnt = 0;
 
 	if (!ac) {
-		pr_err("%s: APR handle NULL\n", __func__);
+		pr_err_ratelimited("%s: APR handle NULL\n", __func__);
 		return -EINVAL;
 	}
 	if (ac->apr == NULL) {
-		pr_err("%s: AC APR handle NULL\n", __func__);
+		pr_err_ratelimited("%s: AC APR handle NULL\n", __func__);
 		return -EINVAL;
 	}
 	q6asm_stream_add_hdr(ac, &hdr, sizeof(hdr), TRUE, stream_id);
@@ -9184,11 +9205,11 @@ static int __q6asm_cmd_nowait(struct audio_client *ac, int cmd,
 	int rc;
 
 	if (!ac) {
-		pr_err("%s: APR handle NULL\n", __func__);
+		pr_err_ratelimited("%s: APR handle NULL\n", __func__);
 		return -EINVAL;
 	}
 	if (ac->apr == NULL) {
-		pr_err("%s: AC APR handle NULL\n", __func__);
+		pr_err_ratelimited("%s: AC APR handle NULL\n", __func__);
 		return -EINVAL;
 	}
 	q6asm_stream_add_hdr_async(ac, &hdr, sizeof(hdr), TRUE, stream_id);
@@ -9260,11 +9281,11 @@ int __q6asm_send_meta_data(struct audio_client *ac, uint32_t stream_id,
 	int rc = 0;
 
 	if (!ac) {
-		pr_err("%s: APR handle NULL\n", __func__);
+		pr_err_ratelimited("%s: APR handle NULL\n", __func__);
 		return -EINVAL;
 	}
 	if (ac->apr == NULL) {
-		pr_err("%s: AC APR handle NULL\n", __func__);
+		pr_err_ratelimited("%s: AC APR handle NULL\n", __func__);
 		return -EINVAL;
 	}
 	pr_debug("%s: session[%d]\n", __func__, ac->session);
