@@ -47,4 +47,3 @@ Modification Copyright (C) 2018 Robert Bosch Kft  All Rights Reserved
 This software program is licensed subject to the GNU General
 Public License (GPL).Version 2,June 1991,
 available at http://www.fsf.org/copyleft/gpl.html
-
